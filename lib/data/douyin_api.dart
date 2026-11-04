@@ -11,6 +11,34 @@ const kDouyinUserAgent =
     'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 '
     '(KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36';
 
+const kDouyinBaseParams = <String, String>{
+  'device_platform': 'webapp',
+  'aid': '6383',
+  'channel': 'channel_pc_web',
+  'pc_client_type': '1',
+  'pc_libra_divert': 'Linux',
+  'support_h265': '1',
+  'support_dash': '1',
+  'version_code': '170400',
+  'version_name': '17.4.0',
+  'cookie_enabled': 'true',
+  'screen_width': '1080',
+  'screen_height': '2400',
+  'browser_language': 'zh-CN',
+  'browser_platform': 'Linux x86_64',
+  'browser_name': 'Chrome',
+  'browser_version': '156.0.0.0',
+  'browser_online': 'true',
+  'engine_name': 'Blink',
+  'engine_version': '156.0.0.0',
+  'os_name': 'Linux',
+  'os_version': 'x86_64',
+  'platform': 'PC',
+  'downlink': '10',
+  'effective_type': '4g',
+  'round_trip_time': '200',
+};
+
 class DouyinApiException implements Exception {
   const DouyinApiException(
     this.message, {
@@ -48,33 +76,7 @@ class DouyinApi {
   final SessionStore _session;
   final Dio _dio;
 
-  Map<String, String> get _baseParams => <String, String>{
-    'device_platform': 'webapp',
-    'aid': '6383',
-    'channel': 'channel_pc_web',
-    'pc_client_type': '1',
-    'pc_libra_divert': 'Linux',
-    'support_h265': '1',
-    'support_dash': '1',
-    'version_code': '170400',
-    'version_name': '17.4.0',
-    'cookie_enabled': 'true',
-    'screen_width': '1080',
-    'screen_height': '2400',
-    'browser_language': 'zh-CN',
-    'browser_platform': 'Linux x86_64',
-    'browser_name': 'Chrome',
-    'browser_version': '156.0.0.0',
-    'browser_online': 'true',
-    'engine_name': 'Blink',
-    'engine_version': '156.0.0.0',
-    'os_name': 'Linux',
-    'os_version': 'x86_64',
-    'platform': 'PC',
-    'downlink': '10',
-    'effective_type': '4g',
-    'round_trip_time': '200',
-  };
+  Map<String, String> get _baseParams => kDouyinBaseParams;
 
   Future<Map<String, String>> _headers({
     String referer = 'https://www.douyin.com/?recommend=1',

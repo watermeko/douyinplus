@@ -31,6 +31,25 @@ class MainActivity : FlutterActivity() {
                     }
                 }
 
+                "setCookies" -> {
+                    val url = call.argument<String>("url") ?: "https://www.douyin.com"
+                    val cookies = call.argument<Map<String, String>>("cookies")
+                        ?: emptyMap()
+                    val cookieManager = CookieManager.getInstance()
+                    cookieManager.setAcceptCookie(true)
+                    for ((name, value) in cookies) {
+                        if (name.isBlank() || value.isEmpty()) continue
+                        if (name.any { it == ';' || it == '=' || it.isWhitespace() }) continue
+                        if (value.contains(';') || value.contains('\n')) continue
+                        cookieManager.setCookie(
+                            url,
+                            "$name=$value; Path=/; Domain=.douyin.com; Secure; HttpOnly; SameSite=None",
+                        )
+                    }
+                    cookieManager.flush()
+                    result.success(true)
+                }
+
                 else -> result.notImplemented()
             }
         }

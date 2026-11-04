@@ -13,14 +13,28 @@ class FeedVideoItem extends StatefulWidget {
     super.key,
     required this.aweme,
     required this.isActive,
+    this.paused = false,
+    this.liked = false,
+    this.collected = false,
+    this.diggCount,
+    this.collectCount,
     this.onAvatarTap,
     this.onAction,
+    this.onLikeTap,
+    this.onCollectTap,
   });
 
   final Aweme aweme;
   final bool isActive;
+  final bool paused;
+  final bool liked;
+  final bool collected;
+  final int? diggCount;
+  final int? collectCount;
   final VoidCallback? onAvatarTap;
   final ValueChanged<String>? onAction;
+  final VoidCallback? onLikeTap;
+  final VoidCallback? onCollectTap;
 
   @override
   State<FeedVideoItem> createState() => _FeedVideoItemState();
@@ -53,6 +67,17 @@ class _FeedVideoItemState extends State<FeedVideoItem>
         _initializeVideo();
       } else {
         _stopVideo();
+      }
+    }
+    if (widget.paused != oldWidget.paused) {
+      final controller = _controller;
+      if (controller != null) {
+        if (widget.paused) {
+          controller.pause();
+        } else if (widget.isActive) {
+          controller.play();
+        }
+        setState(() {});
       }
     }
   }
@@ -92,7 +117,11 @@ class _FeedVideoItemState extends State<FeedVideoItem>
         );
         await controller.setLooping(true);
         await controller.setVolume(1);
-        await controller.play();
+        if (widget.paused) {
+          await controller.pause();
+        } else {
+          await controller.play();
+        }
         controller.addListener(_syncDisc);
         if (!mounted || !widget.isActive || generation != _generation) {
           controller.removeListener(_syncDisc);
@@ -228,8 +257,14 @@ class _FeedVideoItemState extends State<FeedVideoItem>
           child: _ActionRail(
             aweme: aweme,
             disc: _disc,
+            liked: widget.liked,
+            collected: widget.collected,
+            diggCount: widget.diggCount ?? aweme.statistics.diggCount,
+            collectCount: widget.collectCount ?? aweme.statistics.collectCount,
             onAvatarTap: widget.onAvatarTap,
             onAction: _notifyAction,
+            onLikeTap: widget.onLikeTap,
+            onCollectTap: widget.onCollectTap,
           ),
         ),
         if (_controller != null)
@@ -571,14 +606,26 @@ class _ActionRail extends StatelessWidget {
   const _ActionRail({
     required this.aweme,
     required this.disc,
+    required this.liked,
+    required this.collected,
+    required this.diggCount,
+    required this.collectCount,
     this.onAvatarTap,
     this.onAction,
+    this.onLikeTap,
+    this.onCollectTap,
   });
 
   final Aweme aweme;
   final AnimationController disc;
+  final bool liked;
+  final bool collected;
+  final int diggCount;
+  final int collectCount;
   final VoidCallback? onAvatarTap;
   final ValueChanged<String>? onAction;
+  final VoidCallback? onLikeTap;
+  final VoidCallback? onCollectTap;
 
   @override
   Widget build(BuildContext context) {
@@ -592,9 +639,10 @@ class _ActionRail extends StatelessWidget {
         ),
         const SizedBox(height: 16),
         GlassActionButton(
-          icon: Icons.favorite_border_rounded,
-          label: formatCount(aweme.statistics.diggCount),
-          onTap: () => onAction?.call('点赞'),
+          icon: liked ? Icons.favorite_rounded : Icons.favorite_border_rounded,
+          label: formatCount(diggCount),
+          active: liked,
+          onTap: onLikeTap ?? () => onAction?.call('点赞'),
         ),
         const SizedBox(height: 15),
         GlassActionButton(
@@ -604,9 +652,10 @@ class _ActionRail extends StatelessWidget {
         ),
         const SizedBox(height: 15),
         GlassActionButton(
-          icon: Icons.star_border_rounded,
-          label: formatCount(aweme.statistics.collectCount),
-          onTap: () => onAction?.call('收藏'),
+          icon: collected ? Icons.star_rounded : Icons.star_border_rounded,
+          label: formatCount(collectCount),
+          active: collected,
+          onTap: onCollectTap ?? () => onAction?.call('收藏'),
         ),
         const SizedBox(height: 15),
         GlassActionButton(

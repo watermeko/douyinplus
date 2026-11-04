@@ -1,12 +1,20 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../core/config.dart';
 import '../../core/format.dart';
 import '../../core/theme.dart';
 import '../../core/widgets/glass.dart';
 import '../../core/widgets/liquid_background.dart';
 import '../../data/app_controller.dart';
 import '../../data/feed_controller.dart';
+import '../../data/interaction_repository.dart';
+import '../../data/interactions_controller.dart';
+import '../../data/models/aweme.dart';
+import '../../data/signature_bridge.dart';
+import '../debug/signature_bridge_debug_page.dart';
+import 'comments_sheet.dart';
 import 'feed_video_item.dart';
 
 class FeedPage extends StatefulWidget {
@@ -19,18 +27,29 @@ class FeedPage extends StatefulWidget {
 class _FeedPageState extends State<FeedPage> {
   late final FeedController _feed;
   late final PageController _pageController;
+  late final SignatureBridge _signatureBridge;
+  late final InteractionsController _interactions;
+  late final Listenable _refresh;
   int _current = 0;
+  bool _commentsOpen = false;
 
   @override
   void initState() {
     super.initState();
     _feed = FeedController(context.read<AppController>().api)..loadInitial();
+    _signatureBridge = context.read<AppController>().signatureBridge;
+    _interactions = InteractionsController(
+      gateway: InteractionRepository(_signatureBridge),
+      enabled: kEnableInteractions,
+    );
+    _refresh = Listenable.merge(<Listenable>[_feed, _interactions]);
     _pageController = PageController();
   }
 
   @override
   void dispose() {
     _pageController.dispose();
+    _interactions.dispose();
     _feed.dispose();
     super.dispose();
   }
@@ -44,16 +63,48 @@ class _FeedPageState extends State<FeedPage> {
   }
 
   void _showActionHint(String action) {
+    if (action == '评论') {
+      _openComments();
+      return;
+    }
     showGlassToast(context, '$action功能将在下一版开放');
   }
 
+  Future<void> _toggleLike(Aweme aweme) async {
+    final error = await _interactions.toggleLike(aweme.id);
+    if (error != null && mounted) showGlassToast(context, error);
+  }
+
+  Future<void> _toggleCollect(Aweme aweme) async {
+    final error = await _interactions.toggleCollect(
+      aweme.id,
+      awemeType: aweme.awemeType,
+    );
+    if (error != null && mounted) showGlassToast(context, error);
+  }
+
+  Future<void> _openComments() async {
+    if (_feed.items.isEmpty || _commentsOpen) return;
+    final aweme = _feed.items[_current.clamp(0, _feed.items.length - 1)];
+    setState(() => _commentsOpen = true);
+    await showCommentsSheet(
+      context,
+      awemeId: aweme.id,
+      bridge: _signatureBridge,
+    );
+    if (mounted) setState(() => _commentsOpen = false);
+  }
+
   void _openProfileSheet() {
+    final awemeId = _feed.items.isEmpty
+        ? null
+        : _feed.items[_current.clamp(0, _feed.items.length - 1)].id;
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       barrierColor: Colors.black.withValues(alpha: 0.42),
-      builder: (_) => const _ProfileSheet(),
+      builder: (_) => _ProfileSheet(debugAwemeId: awemeId),
     );
   }
 
@@ -66,11 +117,20 @@ class _FeedPageState extends State<FeedPage> {
     return Scaffold(
       backgroundColor: Colors.black,
       body: ListenableBuilder(
-        listenable: _feed,
+        listenable: _refresh,
         builder: (context, _) {
           return Stack(
             fit: StackFit.expand,
             children: [
+              Positioned(
+                left: 0,
+                top: 0,
+                width: 1,
+                height: 1,
+                child: IgnorePointer(
+                  child: SignatureBridgeHost(bridge: _signatureBridge),
+                ),
+              ),
               _buildBody(app),
               Positioned(
                 top: topPadding + 8,
@@ -188,8 +248,18 @@ class _FeedPageState extends State<FeedPage> {
           key: ValueKey(item.id),
           aweme: item,
           isActive: index == _current,
+          paused: _commentsOpen,
+          liked: _interactions.isLiked(item.id),
+          collected: _interactions.isCollected(item.id),
+          diggCount:
+              item.statistics.diggCount + _interactions.likeDelta(item.id),
+          collectCount:
+              item.statistics.collectCount +
+              _interactions.collectDelta(item.id),
           onAvatarTap: _openProfileSheet,
           onAction: _showActionHint,
+          onLikeTap: () => _toggleLike(item),
+          onCollectTap: () => _toggleCollect(item),
         );
       },
     );
@@ -357,7 +427,9 @@ class _FeedEmpty extends StatelessWidget {
 }
 
 class _ProfileSheet extends StatelessWidget {
-  const _ProfileSheet();
+  const _ProfileSheet({this.debugAwemeId});
+
+  final String? debugAwemeId;
 
   @override
   Widget build(BuildContext context) {
@@ -506,6 +578,22 @@ class _ProfileSheet extends StatelessWidget {
                 ),
               ],
             ),
+            if (kDebugMode) ...[
+              const SizedBox(height: 10),
+              GlassButton(
+                label: '签名桥测试（Debug）',
+                icon: Icons.terminal_rounded,
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => SignatureBridgeDebugPage(
+                        initialAwemeId: debugAwemeId,
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ],
             const SizedBox(height: 12),
             Text(
               '非官方客户端 · 数据仅保存在本机',

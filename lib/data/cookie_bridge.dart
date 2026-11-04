@@ -30,6 +30,24 @@ class CookieBridge {
     }
   }
 
+  /// Writes the saved session cookies into the shared WebView CookieManager.
+  ///
+  /// Used to keep the hidden signature WebView in sync when the session was
+  /// imported from a debug file rather than created by the login WebView.
+  /// Returns false when the native side is unavailable.
+  static Future<bool> setDouyinCookies(Map<String, String> cookies) async {
+    if (cookies.isEmpty) return true;
+    try {
+      final result = await _channel.invokeMethod<bool>('setCookies', {
+        'url': 'https://www.douyin.com',
+        'cookies': cookies,
+      });
+      return result ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
+
   static Map<String, String> parseCookieHeader(String header) {
     final result = <String, String>{};
     for (final part in header.split(';')) {

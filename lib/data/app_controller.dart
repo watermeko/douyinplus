@@ -8,6 +8,7 @@ import 'cookie_bridge.dart';
 import 'douyin_api.dart';
 import 'models/user_profile.dart';
 import 'session_store.dart';
+import 'signature_bridge.dart';
 
 enum AuthStatus { checking, loggedOut, loggedIn, error }
 
@@ -19,6 +20,10 @@ class AppController extends ChangeNotifier {
 
   final SessionStore sessionStore;
   late final DouyinApi api;
+
+  SignatureBridge? _signatureBridge;
+  SignatureBridge get signatureBridge =>
+      _signatureBridge ??= SignatureBridge(sessionStore: sessionStore);
 
   AuthStatus status = AuthStatus.checking;
   UserProfile? profile;
@@ -118,10 +123,19 @@ class AppController extends ChangeNotifier {
   Future<void> logout() async {
     await sessionStore.clear();
     await CookieBridge.clearAll();
+    _signatureBridge?.dispose();
+    _signatureBridge = null;
     profile = null;
     error = null;
     status = AuthStatus.loggedOut;
     notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    _signatureBridge?.dispose();
+    _signatureBridge = null;
+    super.dispose();
   }
 
   Future<void> _importDebugCookiesIfNeeded() async {
