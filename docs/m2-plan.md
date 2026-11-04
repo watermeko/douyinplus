@@ -355,7 +355,7 @@ Tag 触发 GitHub Actions：
 | --- | --- | --- |
 | M2.1 评论只读面板 | ✅ | 生产页已接入：评论列表、分页/去重、图文/表情评论、加载/空/错误状态；打开面板暂停视频，关闭恢复 |
 | M2.2 点赞 / 收藏 | 🚧 代码完成，默认关闭 | `InteractionRepository` + `InteractionsController` + ActionRail 激活态/计数；乐观更新、失败回滚、请求中防重复；单元测试覆盖 |
-| M2.3 GitHub Release | 🚧 工程完成，未发布 | release 签名 Gradle 配置、tag 触发 Actions、APK + SHA-256、安装/隐私/发布文档、版本号 `0.2.0+2` |
+| M2.3 GitHub Release | ✅ | release 签名 Gradle 配置、tag 触发 Actions、APK + SHA-256、安装/隐私/发布文档；仓库与 `v0.2.0` Release 已发布 |
 | M2.4 测试 | 🟡 部分 | `flutter analyze` 无问题；28 个单元测试通过；release APK 覆盖安装与播放回归通过；评论区被账号验证码阻断，见 §14 |
 
 签名桥补充：
@@ -399,6 +399,15 @@ M2 的评论浏览与发布工程已达到可交付状态；互动代码完成�
 | 评论区 | 打开暂停视频、错误态与重试可用；加载被账号验证码阻断（见阻塞） |
 | 日志脱敏 | logcat 中 `sessionid` / `sid_guard` / `passport_csrf` / `msToken` / `a_bogus` 命中 0 |
 | 内存 | 含隐藏签名 WebView，总 PSS ≈ 164 MB |
+
+### 发布链路
+
+- GitHub 仓库：<https://github.com/watermeko/douyinplus>（public）。
+- Release keystore 由本机生成（RSA 4096，`CN=DouyinPlus`，有效期 10000 天），凭据保存在 `.release-credentials.txt` 与 `android/key.properties`（均被 `.gitignore` 排除，需离线备份）。
+- 四个 Actions secrets 已配置；`v0.2.0` tag 触发 `Release APK` 工作流成功（analyze / test / 签名构建 / SHA-256 / 创建 Release）。
+- 下载已发布资产复核：`sha256sum -c` 通过；`apksigner` 证书 `CN=DouyinPlus`，SHA-256 `99:96:45:88:26:c6:64:7f:23:ef:0c:3b:0b:0a:9a:16:c4:1a:d6:1c:d8:cb:8c:02:58:e6:96:1f:39:05:e2:8c`（去冒号后 `99964588...`），与本地构建一致；`versionName=0.2.0`。
+- 在全新 AVD 上安装该资产并启动成功，进入登录页（无既有会话）。
+- 已发布的 APK 为 release 签名，与此前 `adb install` 的 debug 签名开发版互斥；从开发版切换需卸载一次。
 
 ### 发现并修复
 

@@ -27,6 +27,7 @@ UI 采用 **Liquid Glass（液态玻璃）** 设计语言，基于 `liquid_glass
 | 评论浏览 | ✅ | 隐藏 WebView 签名桥；分页、加载更多、空/错误状态 |
 | 评论回复展开 | ⚠️ | 回复接口仍超时，暂只显示回复数 |
 | 点赞 / 收藏 | 🚧 | 代码已接入，默认关闭（见下方开关） |
+| Release 分发 | ✅ | v0.2.0 已发布：签名 APK + SHA-256 + 安装/隐私文档 |
 | 评论发布 / 关注 / 分享 | ⛔ | 暂不实现 |
 
 ## 环境
@@ -146,6 +147,7 @@ docs/
 
 ## 分发与安装
 
+- 下载：<https://github.com/watermeko/douyinplus/releases>
 - 通过 GitHub Release 分发签名 APK，附 SHA-256 校验和。
 - 构建与密钥流程见 [`docs/release.md`](docs/release.md)，安装步骤与风险提示见 [`docs/install.md`](docs/install.md)，数据处理见 [`docs/privacy.md`](docs/privacy.md)。
 - 最低 Android 7.0（minSdk 24）。
