@@ -98,6 +98,7 @@ Get-FileHash .\douyinplus-v0.2.0.apk -Algorithm SHA256
 - `versionCode` 取 GitHub Actions 的 `GITHUB_RUN_NUMBER`，单调递增；不要手动回退。
 - 同一签名的更高 `versionCode` APK 可以覆盖安装并保留登录数据。
 - 更换签名或包名会让旧版无法覆盖安装；包名 `dev.watermeko.douyinplus` 不应再改。
+- 首个公开发布（v0.2.0）使用本机生成的 release keystore（`CN=DouyinPlus`）。此前用手动 `adb install` 装过 debug 签名的开发版时，无法覆盖安装，需要先卸载一次（会清空本机登录态），之后的正式版之间可以正常覆盖升级。
 
 ## 7. 发布前检查清单
 
