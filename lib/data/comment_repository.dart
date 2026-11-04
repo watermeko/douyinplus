@@ -94,6 +94,11 @@ class CommentRepository implements CommentSource {
   }
 
   CommentErrorKind _kindFor(SignatureResponse response) {
+    final bridgeError = response.error ?? '';
+    if (bridgeError.contains('安全验证') || bridgeError.contains('风控')) {
+      return CommentErrorKind.risk;
+    }
+    if (bridgeError.contains('登录态')) return CommentErrorKind.auth;
     if (response.statusCode == 401) return CommentErrorKind.auth;
     if (response.statusCode == 403) return CommentErrorKind.risk;
     if (response.error != null &&
@@ -113,7 +118,7 @@ class CommentRepository implements CommentSource {
       case CommentErrorKind.auth:
         return '登录状态已失效，请重新登录';
       case CommentErrorKind.risk:
-        return '评论加载被风控拦截，请稍后重试';
+        return '需要完成抖音安全验证，请重新登录后再试';
       case CommentErrorKind.empty:
         return '评论接口返回空响应，请稍后重试';
       case CommentErrorKind.network:

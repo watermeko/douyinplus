@@ -178,10 +178,16 @@ class SignatureBridge implements SignedClient {
 
   Future<bool> _currentPageLooksLikeRisk() async {
     try {
-      final title = await _controller?.runJavaScriptReturningResult(
-        'document.title',
+      final probe = await _controller?.runJavaScriptReturningResult(
+        """
+(() => {
+  var el = document.querySelector('#captcha_container, .captcha_verify_container, #captcha-verify-image, iframe[src*="captcha"], iframe[src*="verify"]');
+  if (el) return 'dom-captcha';
+  return (document.title || '').toString();
+})()
+""",
       );
-      final text = title?.toString().toLowerCase() ?? '';
+      final text = probe?.toString().toLowerCase() ?? '';
       return text.contains('验证') ||
           text.contains('captcha') ||
           text.contains('verify');
@@ -199,9 +205,26 @@ class SignatureBridge implements SignedClient {
     if (await _currentPageLooksLikeRisk()) _markRiskPage();
   }
 
+  /// XHR timeouts are the symptom, not the cause: when the page is sitting on
+  /// a verification challenge every signed request stalls. Probe the DOM and
+  /// report the real reason instead of a generic timeout.
+  Future<SignatureResponse> _classifyTimeout(SignatureResponse response) async {
+    final timedOut =
+        response.statusCode == -2 ||
+        (response.error?.toLowerCase().contains('timeout') ?? false);
+    if (!timedOut) return response;
+    if (await _currentPageLooksLikeRisk()) {
+      _markRiskPage();
+      return _error(_riskMessage);
+    }
+    return response;
+  }
+
+  static const _riskMessage = '需要完成抖音安全验证，请重新登录后再试';
+
   void _markRiskPage() {
     _pageReady = false;
-    lastError.value = '需要完成抖音安全验证，请重新加载签名页';
+    lastError.value = _riskMessage;
     status.value = SignatureBridgeStatus.error;
     _completeReadyWaiters();
   }
@@ -324,18 +347,47 @@ class SignatureBridge implements SignedClient {
       });
       await controller.runJavaScript('window.__dpBridgeRequest($payload);');
 
-      final response = await responseCompleter.future.timeout(
-        _requestTimeout,
-        onTimeout: () {
+      // A verification challenge can be injected while the request is in
+      // flight. Poll the DOM so the UI fails in a few seconds instead of
+      // waiting for the 20s XHR timeout.
+      var probing = false;
+      final riskWatch = Timer.periodic(const Duration(seconds: 3), (_) async {
+        if (probing) return;
+        probing = true;
+        try {
+          final pending = _pending[id];
+          if (pending == null || pending.isCompleted) return;
+          if (!await _currentPageLooksLikeRisk()) return;
+          _markRiskPage();
           _pending.remove(id);
-          return _error('签名桥请求超时');
-        },
-      );
+          if (!pending.isCompleted) pending.complete(_error(_riskMessage));
+        } finally {
+          probing = false;
+        }
+      });
+
+      SignatureResponse response;
+      try {
+        response = await responseCompleter.future.timeout(
+          _requestTimeout,
+          onTimeout: () async {
+            _pending.remove(id);
+            if (await _currentPageLooksLikeRisk()) {
+              _markRiskPage();
+              return _error(_riskMessage);
+            }
+            return _error('签名桥请求超时');
+          },
+        );
+      } finally {
+        riskWatch.cancel();
+      }
+      final classified = await _classifyTimeout(response);
       final duration = DateTime.now().difference(started);
       final withDuration = SignatureResponse(
-        statusCode: response.statusCode,
-        body: response.body,
-        error: response.error,
+        statusCode: classified.statusCode,
+        body: classified.body,
+        error: classified.error,
         duration: duration,
       );
       if (!withDuration.isSuccess) {
@@ -357,6 +409,10 @@ class SignatureBridge implements SignedClient {
 
   Future<bool> _waitForReady() async {
     if (_pageReady) return true;
+    // A page already flagged as risky cannot recover without interaction.
+    // Fail fast and let the caller surface the reason instead of stalling for
+    // the full ready timeout on every retry.
+    if (status.value == SignatureBridgeStatus.error) return false;
     final completer = _readyCompleter ??= Completer<void>();
     try {
       await completer.future.timeout(_readyTimeout);

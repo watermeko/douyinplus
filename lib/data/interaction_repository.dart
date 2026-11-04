@@ -105,6 +105,11 @@ class InteractionRepository implements InteractionGateway {
   }
 
   InteractionErrorKind _kindFor(SignatureResponse response) {
+    final bridgeError = response.error ?? '';
+    if (bridgeError.contains('安全验证') || bridgeError.contains('风控')) {
+      return InteractionErrorKind.risk;
+    }
+    if (bridgeError.contains('登录态')) return InteractionErrorKind.auth;
     if (response.statusCode == 401) return InteractionErrorKind.auth;
     if (response.statusCode == 403) return InteractionErrorKind.risk;
     if (response.error != null &&
@@ -124,7 +129,7 @@ class InteractionRepository implements InteractionGateway {
       case InteractionErrorKind.auth:
         return '$action失败：登录状态已失效';
       case InteractionErrorKind.risk:
-        return '$action被风控拦截，本次操作已撤销';
+        return '$action被风控拦截，本次操作已撤销；若反复出现请重新登录';
       case InteractionErrorKind.empty:
         return '$action接口返回空响应，请稍后重试';
       case InteractionErrorKind.network:

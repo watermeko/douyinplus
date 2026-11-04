@@ -1,6 +1,6 @@
 # M2 方案：评论、互动与 GitHub Release 分发
 
-> 状态：主要功能已实现，发布与互动验收见 §13 · 2026-11-04
+> 状态：主要功能已实现，M2.4 模拟器验收见 §14 · 2026-11-04
 >
 > 前置文档：[`douyin-api.md`](douyin-api.md)
 >
@@ -356,7 +356,7 @@ Tag 触发 GitHub Actions：
 | M2.1 评论只读面板 | ✅ | 生产页已接入：评论列表、分页/去重、图文/表情评论、加载/空/错误状态；打开面板暂停视频，关闭恢复 |
 | M2.2 点赞 / 收藏 | 🚧 代码完成，默认关闭 | `InteractionRepository` + `InteractionsController` + ActionRail 激活态/计数；乐观更新、失败回滚、请求中防重复；单元测试覆盖 |
 | M2.3 GitHub Release | 🚧 工程完成，未发布 | release 签名 Gradle 配置、tag 触发 Actions、APK + SHA-256、安装/隐私/发布文档、版本号 `0.2.0+2` |
-| M2.4 测试 | 🟡 部分 | `flutter analyze` 无问题；23 个单元测试通过；模拟器评论区实测通过；真机未回归 |
+| M2.4 测试 | 🟡 部分 | `flutter analyze` 无问题；28 个单元测试通过；release APK 覆盖安装与播放回归通过；评论区被账号验证码阻断，见 §14 |
 
 签名桥补充：
 - 只读接口实测：3 页评论 30 条、详情 118906 bytes / 376ms；生产评论面板实测 35 条并触发第二页。
@@ -384,3 +384,34 @@ Tag 触发 GitHub Actions：
 ### 结论
 
 M2 的评论浏览与发布工程已达到可交付状态；互动代码完成但保持 feature flag 关闭；公开发布仍缺少密钥和仓库侧配置。在完成互动写入验证与 Release APK 安装验证前，不将 M2 标记为全部验收通过。
+
+## 14. M2.4 验收记录（2026-11-04，模拟器）
+
+环境：AVD `flclash`（API 34，x86_64），release APK（未配置 keystore，使用 debug key 签名，仅本机验证）。
+
+| 项目 | 结果 |
+| --- | --- |
+| analyze / test | 无问题；28 个测试通过 |
+| Release 构建 | `flutter build apk --release` 成功（51.2 MB，增量约 100s） |
+| 覆盖安装 | 在已装 `0.2.0` 开发构建上 `adb install -r` 成功；`firstInstallTime` 保持 2026-11-04 03:15:43，登录态保留 |
+| 登录态 | 个人面板 419 关注 / 29 粉丝；隐藏 WebView 复用会话 |
+| 推荐流 + 播放 | 连续滑动切换正常，视频初始化成功（1920×1080 / 1440×1080），无崩溃 |
+| 评论区 | 打开暂停视频、错误态与重试可用；加载被账号验证码阻断（见阻塞） |
+| 日志脱敏 | logcat 中 `sessionid` / `sid_guard` / `passport_csrf` / `msToken` / `a_bogus` 命中 0 |
+| 内存 | 含隐藏签名 WebView，总 PSS ≈ 164 MB |
+
+### 发现并修复
+
+1. **切换视频抛异常**：`AnimationController.stop` 报 “Null check operator used on a null value”。`FeedVideoItem.dispose` 先释放 `_disc` 再调用 `_stopVideo()`，而后者仍在调 `_disc.stop()`。已调整为先停播放器再释放 ticker，复测连续滑动无异常。
+2. **验证码被误报成超时**：签名页进入 `rmc-verifycenter` 后，签名请求空等 20s 才报“评论加载超时”。新增验证码 DOM 探测（`#captcha_container`、`iframe[src*=captcha]` 等）、请求进行中每 3s 探测、error 状态不再等待 25s ready 超时，并把桥级“安全验证”错误映射为 risk。复测提示约 2s 出现，文案为“需要完成抖音安全验证，请重新登录后再试”。
+
+### 阻塞与未完成
+
+- 隐藏 WebView 当前停在抖音验证码页（开发期写入触发），只读评论请求同样被阻断。该状态需要账号本人完成官方验证或重新登录后才能复测；本轮未继续发写请求，避免加重风控。
+- 因此“评论首页成功率 ≥ 90%”“翻页/回复展开”“互动失败回滚端到端”仍未验收。
+- 真机回归、载入真实 keystore 的发布构建、GitHub Release 发布仍待完成。
+- 首个 feed 条目为图文帖时只显示渐变背景（图文未渲染），非阻塞，待单独排查。
+
+### 结论
+
+Release 构建链路、覆盖安装升级、登录态保留、推荐流与播放、日志脱敏在模拟器上通过；评论与互动的端到端验收受账号验证码阻塞，M2 仍不标记为全部验收通过。

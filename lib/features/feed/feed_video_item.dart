@@ -84,8 +84,10 @@ class _FeedVideoItemState extends State<FeedVideoItem>
 
   @override
   void dispose() {
-    _disc.dispose();
+    // Stop and release the player before the ticker goes away: `_stopVideo`
+    // calls `_disc.stop()`, which throws once the controller is disposed.
     _stopVideo(notify: false);
+    _disc.dispose();
     super.dispose();
   }
 

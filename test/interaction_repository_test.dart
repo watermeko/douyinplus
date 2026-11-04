@@ -65,7 +65,11 @@ void main() {
       throwsA(
         isA<InteractionException>()
             .having((e) => e.kind, 'kind', InteractionErrorKind.risk)
-            .having((e) => e.message, 'message', '点赞被风控拦截，本次操作已撤销'),
+            .having(
+              (e) => e.message,
+              'message',
+              '点赞被风控拦截，本次操作已撤销；若反复出现请重新登录',
+            ),
       ),
     );
 
@@ -79,6 +83,27 @@ void main() {
         isA<InteractionException>()
             .having((e) => e.kind, 'kind', InteractionErrorKind.api)
             .having((e) => e.message, 'message', '点赞失败：啊哦，服务器打瞌睡了'),
+      ),
+    );
+  });
+
+  test('bridge risk-control message is classified as risk', () async {
+    final client = _FakeSignedClient()
+      ..response = const SignatureResponse(
+        statusCode: -1,
+        body: '',
+        error: '需要完成抖音安全验证，请重新登录后再试',
+      );
+    final repository = InteractionRepository(client);
+
+    await expectLater(
+      repository.setDigg(awemeId: '1', liked: true),
+      throwsA(
+        isA<InteractionException>().having(
+          (e) => e.kind,
+          'kind',
+          InteractionErrorKind.risk,
+        ),
       ),
     );
   });
