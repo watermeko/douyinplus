@@ -1,0 +1,5 @@
+storePassword=change-me
+keyPassword=change-me
+keyAlias=douyinplus
+# Relative to android/app (Gradle module directory); this points at android/key.jks
+storeFile=../key.jks
