@@ -8,8 +8,16 @@ class _FakeGateway implements InteractionGateway {
   bool likeFails = false;
   bool collectFails = false;
   Completer<void>? likeGate;
+  InteractionState? state;
   final List<String> likeCalls = <String>[];
   final List<String> collectCalls = <String>[];
+  final List<String> stateCalls = <String>[];
+
+  @override
+  Future<InteractionState?> fetchState(String awemeId) async {
+    stateCalls.add(awemeId);
+    return state;
+  }
 
   @override
   Future<void> setDigg({required String awemeId, required bool liked}) async {
@@ -73,6 +81,50 @@ void main() {
     expect(controller.isCollected('a2'), isTrue);
     expect(controller.collectDelta('a2'), 1);
     controller.dispose();
+  });
+
+  test('hydrate applies the server like / collect state once', () async {
+    final gateway = _FakeGateway()
+      ..state = const InteractionState(liked: true, collected: true);
+    final controller = InteractionsController(gateway: gateway);
+
+    await controller.hydrate('a1');
+    expect(controller.isLiked('a1'), isTrue);
+    expect(controller.isCollected('a1'), isTrue);
+    expect(controller.likeDelta('a1'), 1);
+
+    await controller.hydrate('a1');
+    expect(gateway.stateCalls, ['a1']);
+  });
+
+  test('a tap before hydration wins over the delayed state', () async {
+    final gateway = _FakeGateway()
+      ..state = const InteractionState(liked: true, collected: false);
+    final controller = InteractionsController(gateway: gateway);
+
+    final hydrate = controller.hydrate('a1');
+    await controller.toggleLike('a1');
+    await hydrate;
+    expect(controller.isLiked('a1'), isTrue);
+    expect(gateway.likeCalls, ['a1:1']);
+  });
+
+  test('hydrate stops probing after two failed state reads', () async {
+    final gateway = _FakeGateway();
+    final controller = InteractionsController(gateway: gateway);
+
+    await controller.hydrate('a1');
+    await controller.hydrate('a2');
+    await controller.hydrate('a3');
+    expect(gateway.stateCalls, ['a1', 'a2']);
+  });
+
+  test('hydrate is skipped when interactions are disabled', () async {
+    final gateway = _FakeGateway();
+    final controller = InteractionsController(gateway: gateway, enabled: false);
+
+    await controller.hydrate('a1');
+    expect(gateway.stateCalls, isEmpty);
   });
 
   test('disabled interactions do not call the gateway', () async {

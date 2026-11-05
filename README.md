@@ -5,7 +5,7 @@
 - 通过抖音官方网页完成账号登录，并安全保存会话 Cookie
 - 浏览推荐视频流（上下滑动切换、视频播放、分页加载）
 - 只读评论面板：分页、图文/表情评论、打开时暂停视频
-- 点赞 / 收藏基础能力（乐观更新、失败回滚；默认关闭，见下）
+- 点赞 / 收藏（乐观更新、失败回滚；初始状态从 `aweme/detail` 同步）
 - 隐藏 WebView 签名桥，读取需要 `a_bogus` / `msToken` 的接口
 - GitHub Release 签名 APK 分发与校验说明
 
@@ -26,7 +26,7 @@ UI 采用 **Liquid Glass（液态玻璃）** 设计语言，基于 `liquid_glass
 | 调试 Cookie 导入 | ✅ | 仅 Debug 构建，支持文件与文本导入 |
 | 评论浏览 | ✅ | 隐藏 WebView 签名桥；分页、加载更多、空/错误状态 |
 | 评论回复展开 | ⚠️ | 回复接口仍超时，暂只显示回复数 |
-| 点赞 / 收藏 | 🚧 | 代码已接入，默认关闭（见下方开关） |
+| 点赞 / 收藏 | ✅ | 默认开启；可用编译开关 `DOUYINPLUS_ENABLE_INTERACTIONS=false` 关闭 |
 | Release 分发 | ✅ | v0.2.0 已发布：签名 APK + SHA-256 + 安装/隐私文档 |
 | 评论发布 / 关注 / 分享 | ⛔ | 暂不实现 |
 
@@ -43,14 +43,15 @@ flutter pub get
 flutter run -d <android-device>
 ```
 
-点赞 / 收藏会写入真实账号，默认关闭。仅在自己账号上低频验收时启用：
+点赞 / 收藏会写入真实账号，v0.2.1 起默认开启，且只在用户点击时发起单次请求。
+如需构建不含写操作的版本：
 
 ```bash
-flutter run -d <android-device> \
-  --dart-define=DOUYINPLUS_ENABLE_INTERACTIONS=true
+flutter build apk --release \
+  --dart-define=DOUYINPLUS_ENABLE_INTERACTIONS=false
 ```
 
-> 开发期连续写入曾触发抖音验证码，因此公开 Release 不默认开启互动；详见 [`docs/m2-plan.md`](docs/m2-plan.md) 与 [`docs/release-notes/v0.2.0.md`](docs/release-notes/v0.2.0.md)。
+> 开发期连续写入曾触发抖音验证码；v0.2.1 已按正常人工频率复测通过。详见 [`docs/m2-plan.md`](docs/m2-plan.md) 与 [`docs/release-notes/v0.2.1.md`](docs/release-notes/v0.2.1.md)。
 
 或构建 APK：
 

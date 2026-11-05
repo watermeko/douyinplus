@@ -181,16 +181,31 @@ class SignatureBridge implements SignedClient {
       final probe = await _controller?.runJavaScriptReturningResult(
         """
 (() => {
-  var el = document.querySelector('#captcha_container, .captcha_verify_container, #captcha-verify-image, iframe[src*="captcha"], iframe[src*="verify"]');
-  if (el) return 'dom-captcha';
+  var nodes = document.querySelectorAll('#captcha_container, .captcha_verify_container, #captcha-verify-image, iframe[src*="captcha"], iframe[src*="verify"]');
+  for (var i = 0; i < nodes.length; i++) {
+    var el = nodes[i];
+    var r = el.getBoundingClientRect();
+    var style = getComputedStyle(el);
+    if (r.width >= 80 && r.height >= 80 && style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0') {
+      return 'dom-visible-captcha';
+    }
+  }
   return (document.title || '').toString();
 })()
 """,
       );
       final text = probe?.toString().toLowerCase() ?? '';
-      return text.contains('验证') ||
+      // Douyin keeps hidden captcha containers on the normal page, so only a
+      // visible (>=80px) challenge element or a matching title counts.
+      final looksRisk =
+          text.contains('验证') ||
           text.contains('captcha') ||
           text.contains('verify');
+      if (looksRisk) {
+        final sample = text.length > 120 ? text.substring(0, 120) : text;
+        debugPrint('SignatureBridge risk probe hit: $sample');
+      }
+      return looksRisk;
     } catch (_) {
       return false;
     }
@@ -399,6 +414,13 @@ class SignatureBridge implements SignedClient {
         'bytes=${withDuration.body.length} '
         'ms=${duration.inMilliseconds}',
       );
+      // Error bodies only carry a status message; logging a short prefix helps
+      // diagnose blocked endpoints without persisting page content.
+      if (withDuration.statusCode >= 400 && withDuration.body.isNotEmpty) {
+        final body = withDuration.body;
+        final sample = body.length > 160 ? body.substring(0, 160) : body;
+        debugPrint('SignatureBridge $path error body: $sample');
+      }
       result.complete(withDuration);
     } catch (_) {
       result.complete(_error('签名桥请求失败'));

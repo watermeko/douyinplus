@@ -55,6 +55,29 @@ void main() {
     expect(client.lastBody, 'aweme_id=456&action=0&aweme_type=0');
   });
 
+  test('fetchState reads user_digged and user_collected from detail', () async {
+    final client = _FakeSignedClient()
+      ..response = const SignatureResponse(
+        statusCode: 200,
+        body:
+            '{"status_code":0,"aweme_detail":{"aweme_id":"1","user_digged":1,"user_collected":0}}',
+      );
+    final repository = InteractionRepository(client);
+
+    final state = await repository.fetchState('1');
+    expect(state, isNotNull);
+    expect(state!.liked, isTrue);
+    expect(state.collected, isFalse);
+  });
+
+  test('fetchState returns null when the detail request fails', () async {
+    final client = _FakeSignedClient()
+      ..response = const SignatureResponse(statusCode: 403, body: '');
+    final repository = InteractionRepository(client);
+
+    expect(await repository.fetchState('1'), isNull);
+  });
+
   test('maps risk-control and API errors to readable messages', () async {
     final client = _FakeSignedClient();
     final repository = InteractionRepository(client);

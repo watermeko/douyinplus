@@ -28,6 +28,19 @@ abstract class InteractionGateway {
     required bool collected,
     int awemeType = 0,
   });
+
+  /// Reads the account's current like / collect state for a video.
+  ///
+  /// The feed response omits `user_digged` / `user_collected`; `aweme/detail`
+  /// carries both. Returns null when the detail request fails or is blocked.
+  Future<InteractionState?> fetchState(String awemeId) async => null;
+}
+
+class InteractionState {
+  const InteractionState({required this.liked, required this.collected});
+
+  final bool liked;
+  final bool collected;
 }
 
 class InteractionRepository implements InteractionGateway {
@@ -63,6 +76,27 @@ class InteractionRepository implements InteractionGateway {
       }),
     );
     _ensureSuccess(response, action: '收藏');
+  }
+
+  @override
+  Future<InteractionState?> fetchState(String awemeId) async {
+    try {
+      final response = await _client.get(
+        '/aweme/v1/web/aweme/detail/',
+        <String, String>{'aweme_id': awemeId},
+      );
+      if (!response.isSuccess) return null;
+      final json = asMap(jsonDecode(response.body));
+      if (asInt(json['status_code']) != 0) return null;
+      final detail = asMap(json['aweme_detail']);
+      if (detail.isEmpty) return null;
+      return InteractionState(
+        liked: asInt(detail['user_digged']) == 1,
+        collected: asInt(detail['user_collected']) == 1,
+      );
+    } catch (_) {
+      return null;
+    }
   }
 
   void _ensureSuccess(SignatureResponse response, {required String action}) {

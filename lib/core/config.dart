@@ -1,14 +1,11 @@
-/// Compile-time feature flags.
-///
 /// Interactions (like / collect) perform writes on the user's real Douyin
-/// account. They stay off unless explicitly enabled at build time:
+/// account. They are enabled by default after the low-frequency write path was
+/// validated end to end (v0.2.1). Disable them for a build with:
 ///
 /// ```bash
-/// flutter run --dart-define=DOUYINPLUS_ENABLE_INTERACTIONS=true
+/// flutter build apk --dart-define=DOUYINPLUS_ENABLE_INTERACTIONS=false
 /// ```
-///
-/// Keep the default off for GitHub Release builds until the write path has
-/// been validated on a disposable account without triggering risk control.
 const bool kEnableInteractions = bool.fromEnvironment(
   'DOUYINPLUS_ENABLE_INTERACTIONS',
+  defaultValue: true,
 );

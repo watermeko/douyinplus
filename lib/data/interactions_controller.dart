@@ -17,10 +17,47 @@ class InteractionsController extends ChangeNotifier {
   final Set<String> _collected = <String>{};
   final Set<String> _likesInFlight = <String>{};
   final Set<String> _collectsInFlight = <String>{};
+  final Set<String> _hydrated = <String>{};
+  final Set<String> _touched = <String>{};
+  int _stateFailures = 0;
+  bool _stateDisabled = false;
 
   bool isLiked(String awemeId) => _liked.contains(awemeId);
 
   bool isCollected(String awemeId) => _collected.contains(awemeId);
+
+  /// Reads the account's current like / collect state once per video.
+  ///
+  /// The feed response omits `user_digged` / `user_collected`, so without this
+  /// the first tap could send the wrong direction (for example unliking a video
+  /// that was already liked on the server). Best effort: failures leave the
+  /// optimistic toggle working as before.
+  Future<void> hydrate(String awemeId) async {
+    if (!enabled ||
+        _stateDisabled ||
+        _hydrated.contains(awemeId) ||
+        _touched.contains(awemeId)) {
+      return;
+    }
+    _hydrated.add(awemeId);
+    try {
+      final state = await gateway.fetchState(awemeId);
+      if (state == null) {
+        // `aweme/detail` is blocked (Argus UIFID) in some WebView contexts.
+        // Stop probing after two consecutive failures instead of issuing a
+        // doomed request for every video.
+        if (++_stateFailures >= 2) _stateDisabled = true;
+        return;
+      }
+      _stateFailures = 0;
+      if (_touched.contains(awemeId)) return;
+      _setLiked(awemeId, state.liked);
+      _setCollected(awemeId, state.collected);
+    } catch (_) {
+      // Hydration is best effort.
+      if (++_stateFailures >= 2) _stateDisabled = true;
+    }
+  }
 
   int likeDelta(String awemeId) => _liked.contains(awemeId) ? 1 : 0;
 
@@ -31,6 +68,7 @@ class InteractionsController extends ChangeNotifier {
   Future<String?> toggleLike(String awemeId) async {
     if (!enabled) return '互动功能测试中，暂未开放';
     if (!_likesInFlight.add(awemeId)) return null;
+    _touched.add(awemeId);
 
     final wasLiked = _liked.contains(awemeId);
     _setLiked(awemeId, !wasLiked);
@@ -48,6 +86,7 @@ class InteractionsController extends ChangeNotifier {
   Future<String?> toggleCollect(String awemeId, {int awemeType = 0}) async {
     if (!enabled) return '互动功能测试中，暂未开放';
     if (!_collectsInFlight.add(awemeId)) return null;
+    _touched.add(awemeId);
 
     final wasCollected = _collected.contains(awemeId);
     _setCollected(awemeId, !wasCollected);

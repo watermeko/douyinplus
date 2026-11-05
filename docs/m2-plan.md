@@ -1,6 +1,6 @@
 # M2 方案：评论、互动与 GitHub Release 分发
 
-> 状态：主要功能已实现，M2.4 模拟器验收见 §14 · 2026-11-04
+> 状态：主要功能已实现，M2.4 模拟器验收见 §14，误判修复与互动验收见 §15 · 2026-11-05
 >
 > 前置文档：[`douyin-api.md`](douyin-api.md)
 >
@@ -354,7 +354,7 @@ Tag 触发 GitHub Actions：
 | 模块 | 状态 | 说明 |
 | --- | --- | --- |
 | M2.1 评论只读面板 | ✅ | 生产页已接入：评论列表、分页/去重、图文/表情评论、加载/空/错误状态；打开面板暂停视频，关闭恢复 |
-| M2.2 点赞 / 收藏 | 🚧 代码完成，默认关闭 | `InteractionRepository` + `InteractionsController` + ActionRail 激活态/计数；乐观更新、失败回滚、请求中防重复；单元测试覆盖 |
+| M2.2 点赞 / 收藏 | ✅ v0.2.1 默认开启 | `InteractionRepository` + `InteractionsController` + ActionRail 激活态/计数；乐观更新、失败回滚、请求中防重复；`aweme/detail` 同步初始状态；四条写路径实测 200 |
 | M2.3 GitHub Release | ✅ | release 签名 Gradle 配置、tag 触发 Actions、APK + SHA-256、安装/隐私/发布文档；仓库与 `v0.2.0` Release 已发布 |
 | M2.4 测试 | 🟡 部分 | `flutter analyze` 无问题；28 个单元测试通过；release APK 覆盖安装与播放回归通过；评论区被账号验证码阻断，见 §14 |
 
@@ -424,3 +424,41 @@ M2 的评论浏览与发布工程已达到可交付状态；互动代码完成�
 ### 结论
 
 Release 构建链路、覆盖安装升级、登录态保留、推荐流与播放、日志脱敏在模拟器上通过；评论与互动的端到端验收受账号验证码阻塞，M2 仍不标记为全部验收通过。
+
+## 15. 验证码误判修复与互动验收（2026-11-05）
+
+### 根因
+
+v0.2.0 上线后，用户登录成功仍然提示“需要完成抖音安全验证”。排查发现抖音正常页面的 DOM 里本来就存在隐藏的验证码容器（`#captcha_container` 等），v0.2.0 的检测只要命中元素就判定为风控页，属于**误判**。
+
+### 修复
+
+- 验证码判定改为“元素可见”才成立：`getBoundingClientRect()` ≥ 80×80 且 `display` / `visibility` / `opacity` 正常。
+- 命中时打印 `SignatureBridge risk probe hit:` 便于后续定位（仅标题/标记，不含 URL 查询串）。
+- 保留请求进行中每 3s 探测与 error 状态快速失败。
+
+### 复测结果（模拟器，正式签名包）
+
+| 项目 | 结果 |
+| --- | --- |
+| 评论首屏 | `comment/list` HTTP 200，64246 bytes，729ms，381 条 |
+| 评论翻页 | `comment/list` HTTP 200，71710 bytes，401ms |
+| 点赞 | `commit/item/digg` type=1 → 200，182 bytes，11473ms（冷启动）/ 416ms（暖态） |
+| 取消点赞 | type=0 → 200，182 bytes，416ms |
+| 收藏 / 取消收藏 | `aweme/collect` action=1/0 → 200，192 bytes，约 300ms |
+| 验证码 | 全过程未出现验证页 |
+
+### 同步的状态修正
+
+- `InteractionsController.hydrate()` 每支视频只拉一次 `aweme/detail` 的 `user_digged` / `user_collected`；用户先点击则不再覆盖。
+- `kEnableInteractions` 默认改为 true（v0.2.1），仍可用 `DOUYINPLUS_ENABLE_INTERACTIONS=false` 关闭。
+
+### 发布
+
+- 版本 `0.2.1+3`，release notes `docs/release-notes/v0.2.1.md`，`v0.2.1` tag 由 CI 构建并发布。
+
+### 仍未完成
+
+- `comment/list/reply` 超时未解，回复展开未接入。
+- 图文帖图片未渲染。
+- 真机（Redmi，Android 17）尚未安装回归。

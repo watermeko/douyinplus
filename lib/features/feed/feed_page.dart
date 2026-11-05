@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -44,19 +46,30 @@ class _FeedPageState extends State<FeedPage> {
     );
     _refresh = Listenable.merge(<Listenable>[_feed, _interactions]);
     _pageController = PageController();
+    _feed.addListener(_hydrateCurrent);
   }
 
   @override
   void dispose() {
+    _feed.removeListener(_hydrateCurrent);
     _pageController.dispose();
     _interactions.dispose();
     _feed.dispose();
     super.dispose();
   }
 
+  /// Fetches the account's like / collect state for the visible video so the
+  /// first tap sends the direction the user actually sees.
+  void _hydrateCurrent() {
+    if (_feed.items.isEmpty) return;
+    final index = _current.clamp(0, _feed.items.length - 1);
+    unawaited(_interactions.hydrate(_feed.items[index].id));
+  }
+
   void _onPageChanged(int index) {
     setState(() => _current = index);
     _feed.setCurrentIndex(index);
+    _hydrateCurrent();
     if (index >= _feed.items.length - 2) {
       _feed.loadMore();
     }

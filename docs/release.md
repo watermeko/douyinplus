@@ -73,7 +73,7 @@ macOS 可使用 `base64 -i android/key.jks`。把输出整行粘贴为 secret，
 5. Actions 会执行 analyze / test / 签名构建 / 生成 SHA-256 / 创建 GitHub Release。
 6. 下载 Release 中的 APK，在一台干净设备上安装并验证登录、推荐流、评论区。
 
-工作流固定 `DOUYINPLUS_ENABLE_INTERACTIONS=false`。互动写入目前处于验收阶段，不要在公开发布中默认开启。
+工作流默认按 `kEnableInteractions` 构建（v0.2.1 起互动开启）。如需临时关闭，在 workflow 的 build 步骤追加 `--dart-define=DOUYINPLUS_ENABLE_INTERACTIONS=false`。
 
 ## 5. CI 产物的命名
 
