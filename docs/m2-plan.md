@@ -455,7 +455,9 @@ v0.2.0 上线后，用户登录成功仍然提示“需要完成抖音安全验�
 
 ### 发布
 
-- 版本 `0.2.1+3`，release notes `docs/release-notes/v0.2.1.md`，`v0.2.1` tag 由 CI 构建并发布。
+- 版本 `0.2.1+3`，release notes `docs/release-notes/v0.2.1.md`，`v0.2.1` tag 由 CI 构建并发布（run 41982524541，success）。
+- 发布资产复核：`sha256sum -c` 通过；`apksigner` 证书 `CN=DouyinPlus` 与 v0.2.0 一致；`versionName=0.2.1`、`versionCode=2`。
+- 模拟器用 `adb install -r -d` 覆盖安装正式资产，`firstInstallTime` 保持，登录态保留；`comment/list` 200（62744 bytes）。
 
 ### 仍未完成
 
